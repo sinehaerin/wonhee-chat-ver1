@@ -152,7 +152,7 @@ if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# 6. [첫 접속 시 이름 확인 모달] (공백 기본값 적용)
+# 6. [첫 접속 시 이름 확인 모달]
 @st.dialog("✨ Chloe와의 특별한 만남")
 def ask_user_name_modal():
   st.markdown(
@@ -160,7 +160,6 @@ def ask_user_name_modal():
       unsafe_allow_html=True,
   )
   st.write("채팅을 시작하기 전에, 클로이가 너를 뭐라고 부르면 될까?")
-  # 공백 상태로 입력창 제공
   name_input = st.text_input("내 이름 (또는 호칭)", value="")
   fav_input = st.text_input("평소 좋아하는 취향이나 특징", value="")
 
@@ -195,10 +194,19 @@ user_name = st.session_state.user_name
 user_fav = st.session_state.user_fav
 
 
-# 7. 사이드바 설정
+# 7. 사이드바 설정 (깔끔하게 정돈된 사진 전송 및 설정)
 with st.sidebar:
-  st.markdown("### ⚙️ 설정 & 비밀 수첩")
+  st.markdown("### ⚙️ 설정 & 사진 전송")
   show_thought = st.toggle("💭 클로이의 속마음 훔쳐보기", value=True)
+  st.divider()
+
+  # 📸 사진 업로드 컴포넌트를 안정적인 사이드바에 배치하여 인식 오류 원천 차단
+  st.markdown("### 📸 클로이에게 사진 보내기")
+  uploaded_photo = st.file_uploader(
+      "오늘 먹은 음식, 풍경 등을 공유해보세요!",
+      type=["jpg", "jpeg", "png", "webp"],
+      key="sidebar_photo_uploader",
+  )
   st.divider()
 
   if st.button("🎲 클로이의 심쿵 돌발 질문", use_container_width=True):
@@ -346,7 +354,7 @@ for msg in st.session_state.messages:
       st.caption(f"💭 *(속마음: {msg['thought']})*")
 
 
-# AI 응답 함수
+# AI 응답 함수 (전체 모델 풀 가동)
 def ask_chloe(contents_list, temp=0.9):
   all_gemini_models = [
       "gemini-2.5-flash",
@@ -409,16 +417,8 @@ if st.session_state.get("trigger_event", False):
       })
       st.rerun()
 
-# 12. 입력창 및 사진 첨부 버튼 레이아웃
-col_input, col_file = st.columns([5, 1])
-
-with col_file:
-  uploaded_photo = st.file_uploader(
-      "📸", type=["jpg", "jpeg", "png", "webp"], key="inline_photo_uploader"
-  )
-
-with col_input:
-  prompt = st.chat_input("클로이에게 보낼 메시지를 입력하세요... 💕")
+# 12. 채팅 입력창 (안전한 멀티모달 처리)
+prompt = st.chat_input("클로이에게 보낼 메시지를 입력하세요... 💕")
 
 is_new_photo = (
     uploaded_photo is not None
