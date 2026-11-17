@@ -228,24 +228,42 @@ for msg in st.session_state.messages:
         if msg["role"] == "assistant" and show_thought and "thought" in msg:
             st.caption(f"💭 *(속마음: {msg['thought']})*")
 
-# 10. 돌발 이벤트 버튼 눌렀을 때 처리
-if st.session_state.get("trigger_event", False):
-    st.session_state.trigger_event = False
-    event_prompt = "(시스템 지시: 원희가 먼저 사용자에게 데이트 신청을 하거나, 심쿵할 만한 돌발 질문/상황을 던지며 말을 걸어줘!)"
-    
-    with st.chat_message("assistant", avatar="🥰"):
-        with st.spinner("원희가 무슨 말을 할지 고민 중... 💓"):
-            response = client.models.generate_content(
-                model="gemini-3.5-flash-lite",
-                contents=[types.Content(role="user", parts=[types.Part.from_text(text=event_prompt)])],
+# 🛡️ 안전하게 AI 응답을 받아오는 공통 함수 (일시적 서버 에러 방지!)
+def ask_wonhee(contents_list, temp=0.9):
+    # 1순위 모델 실패 시 2순위 모델로 자동 전환하여 재시도
+    for model_name in ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemma-4-26b"]:
+        try:
+            res = client.models.generate_content(
+                model=model_name,
+                contents=contents_list,
                 config=types.GenerateContentConfig(
                     system_instruction=build_system_instruction(st.session_state.affection),
-                    temperature=0.95,
+                    temperature=temp,
                     response_mime_type="application/json",
                     response_schema=WonheeResponse,
                 )
             )
-            result = json.loads(response.text)
+            return json.loads(res.text)
+        except Exception:
+            continue
+    # 모든 서버가 일시 혼잡할 때 띄울 비상용 귀여운 응답
+    return {
+        "reply": f"{user_name}아, 방금 네 생각 너무 많이 하느라 잠깐 멍때렸어! 다시 한 번만 말해줄래? 😊💕",
+        "inner_thought": "어떡해, 너무 설레서 머리가 하얘졌어...",
+        "affection_change": 1,
+        "mood": "부끄러움😳",
+        "heart_rate": 115,
+        "new_memory": ""
+    }
+
+# 10. 돌발 이벤트 버튼 눌렀을 때 처리
+if st.session_state.get("trigger_event", False):
+    st.session_state.trigger_event = False
+    event_prompt = f"{user_name}아, 나 지금 갑자기 네가 너무 보고 싶은데 이번 주말에 나랑 데이트할래? 너한테 먼저 심쿵할 만한 돌발 질문 하나만 해줘!"
+    
+    with st.chat_message("assistant", avatar="🥰"):
+        with st.spinner("원희가 무슨 말을 할지 고민 중... 💓"):
+            result = ask_wonhee([types.Content(role="user", parts=[types.Part.from_text(text=event_prompt)])], temp=0.95)
             st.session_state.mood = result["mood"]
             st.session_state.heart_rate = result["heart_rate"]
             st.session_state.messages.append({
@@ -271,34 +289,21 @@ if prompt := st.chat_input(f"원희에게 보낼 메시지를 입력하세요...
 
     with st.chat_message("assistant", avatar="🥰"):
         with st.spinner("원희가 입력 중... 💬"):
-            response = client.models.generate_content(
-                model="gemini-3.5-flash-lite",
-                contents=chat_history,
-                config=types.GenerateContentConfig(
-                    system_instruction=build_system_instruction(st.session_state.affection),
-                    temperature=0.9,
-                    response_mime_type="application/json",
-                    response_schema=WonheeResponse,
-                )
-            )
-            result = json.loads(response.text)
+            result = ask_wonhee(chat_history, temp=0.9)
 
-            # 호감도, 기분, 심박수 업데이트
             change = result["affection_change"]
             st.session_state.affection = max(0, min(100, st.session_state.affection + change))
             st.session_state.mood = result["mood"]
             st.session_state.heart_rate = result["heart_rate"]
 
-            # 새로운 기억이 추출되었다면 비밀 수첩에 자동 추가
             new_mem = result.get("new_memory", "").strip()
             if new_mem and new_mem not in st.session_state.memory_notes:
                 st.session_state.memory_notes.append(new_mem)
 
-            # 답변 출력
             st.write(result["reply"])
             if show_thought:
                 change_str = f"+{change}" if change >= 0 else f"{change}"
-                st.caption(f"💭 *(속마음: {result['inner_thought']})* | 💖 호감도 {change_str}%")
+                st.caption(f"💭 (속마음: {result['inner_thought']}) | 💖 호감도 {change_str}%")
 
             st.session_state.messages.append({
                 "role": "assistant",
@@ -306,4 +311,3 @@ if prompt := st.chat_input(f"원희에게 보낼 메시지를 입력하세요...
                 "thought": result["inner_thought"]
             })
             st.rerun()
-        
