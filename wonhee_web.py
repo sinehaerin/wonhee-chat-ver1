@@ -15,40 +15,59 @@ except Exception:
 
 client = genai.Client(api_key=API_KEY)
 
-# 2. 페이지 기본 설정 (와이드 레이아웃 적용 및 감성적인 타이틀)
+# 2. 페이지 기본 설정
 st.set_page_config(
-    page_title="원희와의 비밀 채팅방 💕", page_icon="💌", layout="centered"
+    page_title="Chloe's Secret Chat 💕", page_icon="💌", layout="centered"
 )
 
-# 🎨 [디자인 개선] 커스텀 CSS 적용 (카톡 스타일 및 예쁜 핑크 감성 UI)
+# 🎨 [디자인 개선] 3D 글래스모피즘 & 세련된 네온 감성 CSS
 st.markdown(
     """
     <style>
-    /* 전체 배경 및 폰트 부드럽게 */
     .stApp {
-        background-color: #0e1117;
+        background: radial-gradient(circle at top, #14101f 0%, #090a0f 100%);
         color: #f0f2f6;
     }
-    /* 상단 대시보드 카드 스타일 */
-    .metric-card {
-        background: linear-gradient(135deg, #1e1e2f 0%, #2a1b3d 100%);
-        border: 1px solid #ff4b7255;
-        padding: 15px;
-        border-radius: 15px;
+    /* 3D 입체 글래스 카드 스타일 */
+    .glass-card {
+        background: rgba(30, 25, 45, 0.65);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 105, 180, 0.2);
+        padding: 18px;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
         text-align: center;
-        box-shadow: 0 4px 15px rgba(255, 75, 114, 0.1);
+        margin-bottom: 15px;
     }
-    /* 타이틀 감성 스타일 */
+    /* 타이틀 홀로그램 그라데이션 */
     .main-title {
-        font-size: 28px;
-        font-weight: 800;
-        background: -webkit-linear-gradient(45deg, #ff4b72, #ff8da1);
+        font-size: 32px;
+        font-weight: 900;
+        background: -webkit-linear-gradient(45deg, #ff65b3, #b174ff);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         text-align: center;
         margin-bottom: 5px;
+        letter-spacing: 1px;
     }
-    /* 캡션 및 속마음 스타일 */
+    .sub-title {
+        text-align: center;
+        color: #a69bb1;
+        font-size: 14px;
+        margin-bottom: 20px;
+    }
+    /* 호감도 레벨업 알림 배너 */
+    .level-banner {
+        background: linear-gradient(135deg, #ff4b72 0%, #9c27b0 100%);
+        padding: 10px 15px;
+        border-radius: 12px;
+        text-align: center;
+        font-weight: bold;
+        color: white;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 15px rgba(156, 39, 176, 0.4);
+    }
     .stCaption {
         color: #ff9fb2 !important;
     }
@@ -59,15 +78,15 @@ st.markdown(
 
 
 # 3. AI 응답 구조 정의
-class WonheeResponse(BaseModel):
+class ChloeResponse(BaseModel):
   reply: str = Field(
       description=(
-          "원희가 사용자에게 보내는 다정하고 설레는 카톡 메시지 (1~3문장 반말)"
+          "클로이가 사용자에게 보내는 다정하고 설레는 카톡 메시지 (1~3문장 반말)"
       )
   )
   inner_thought: str = Field(
       description=(
-          "원희가 속으로 생각하는 설레고 귀여운 진짜 속마음 (1문장)"
+          "클로이가 속으로 생각하는 설레고 귀여운 진짜 속마음 (1문장)"
       )
   )
   affection_change: int = Field(
@@ -75,13 +94,13 @@ class WonheeResponse(BaseModel):
   )
   mood: str = Field(
       description=(
-          "원희의 현재 기분 상태 (예:"
-          " 설렘💓, 부끄러움😳, 행복🥰, 걱정🥺, 장난기😜, 삐짐😤 중 택1)"
+          "클로이의 현재 기분 상태 (예:"
+          " 설렘💓, 부끄러움😳, 행복🥰, 새침😎, 걱정🥺, 장난기😜 중 택1)"
       )
   )
   heart_rate: int = Field(
       description=(
-          "원희의 현재 심박수 BPM (평온 75 ~ 설렘/두근거림 135 사이의 정수)"
+          "클로이의 현재 심박수 BPM (평온 75 ~ 설렘/두근거림 135 사이의 정수)"
       )
   )
   new_memory: str = Field(
@@ -106,9 +125,7 @@ def get_korea_time_info():
   elif 18 <= hour < 23:
     time_desc = "저녁/밤 시간대 (하루 고생 위로하기, 데이트 얘기하기 좋은 시간)"
   else:
-    time_desc = (
-        "새벽 감성 시간대 (감수성 풍부해지고 설레는 멘트 치기 딱 좋은 시간)"
-    )
+    time_desc = "새벽 감성 시간대 (감수성 풍부해지고 설레는 멘트 치기 좋은 시간)"
   return now.strftime("%Y년 %m월 %d일 %H시 %M분"), time_desc
 
 
@@ -127,73 +144,70 @@ if "memory_notes" not in st.session_state:
   st.session_state.memory_notes = []
 if "confessed" not in st.session_state:
   st.session_state.confessed = False
+if "last_stage" not in st.session_state:
+  st.session_state.last_stage = "썸 시작"
 if "last_processed_file" not in st.session_state:
   st.session_state.last_processed_file = None
 if "messages" not in st.session_state:
   st.session_state.messages = []
 
 
-# 6. [신규 기능] 첫 접속 시 이름 물어보기 팝업 모달
-@st.dialog("💌 원희와의 첫 만남")
+# 6. [첫 접속 시 이름 확인 모달]
+@st.dialog("✨ Chloe와의 특별한 만남")
 def ask_user_name_modal():
   st.markdown(
-      "<h3 style='text-align: center; color: #ff4b72;'>안녕? 😳</h3>",
+      "<h3 style='text-align: center; color: #ff65b3;'>Hi there! 😳</h3>",
       unsafe_allow_html=True,
   )
-  st.write(
-      "우리 대화하기 전에, 원희가 너를 뭐라고 부르면 될까? 네 이름을"
-      " 알려줘! 💕"
-  )
-  name_input = st.text_input("내 이름 (또는 애칭)", value="지훈")
+  st.write("채팅을 시작하기 전에, 클로이가 너를 뭐라고 부르면 될까?")
+  name_input = st.text_input("내 이름 (또는 호칭)", value="지훈")
   fav_input = st.text_input(
       "평소 좋아하는 취향이나 특징", value="맛있는 거 먹기, 영화 보기"
   )
 
-  if st.button("원희하러 가기 💖", use_container_width=True):
+  if st.button("클로이와 대화 시작하기 💖", use_container_width=True):
     if name_input.strip():
       st.session_state.user_name = name_input.strip()
       st.session_state.user_fav = fav_input.strip()
-      # 초기 첫 인사 메시지 설정
       st.session_state.messages = [{
           "role": "assistant",
           "content": (
-              f"안녕, {st.session_state.user_name}아! 뭐해? 자꾸 네 생각 나서"
-              " 먼저 연락했지~ 오늘 하루 잘 보냈어? 😊"
+              f"Hey, {st.session_state.user_name}! 뭐 하고 있었어? 문득 네"
+              " 생각나서 먼저 연락했지~ 오늘 하루 어땠어? 😊"
           ),
-          "thought": "먼저 연락했는데 좋아해 줬으면 좋겠다... 심장 떨리네.",
+          "thought": (
+              "먼저 연락했는데 좋아해 줬으면 좋겠다... 떨려라."
+          ),
           "image": None,
           "image_type": None,
       }]
       st.rerun()
 
 
-# 이름이 설정되지 않았다면 모달 띄우기
 if not st.session_state.user_name:
   ask_user_name_modal()
-  st.stop()  # 이름 입력 전까지 아래 코드 일시 중지
+  st.stop()
 
 user_name = st.session_state.user_name
 user_fav = st.session_state.user_fav
 
 
-# 7. 사이드바 설정 (깔끔하게 정돈된 프로필 및 수첩)
+# 7. 사이드바 설정
 with st.sidebar:
   st.markdown("### ⚙️ 설정 & 비밀 수첩")
-  show_thought = st.toggle("💭 원희의 속마음 훔쳐보기", value=True)
+  show_thought = st.toggle("💭 클로이의 속마음 훔쳐보기", value=True)
   st.divider()
 
-  # 돌발 심쿵 이벤트 트리거 버튼
-  if st.button("🎲 원희의 심쿵 돌발 질문 받기", use_container_width=True):
+  if st.button("🎲 클로이의 심쿵 돌발 질문", use_container_width=True):
     st.session_state.trigger_event = True
   st.divider()
 
-  # 원희의 비밀 수첩
-  st.markdown("### 📒 원희의 비밀 수첩")
+  st.markdown("### 📒 클로이의 비밀 수첩")
   if st.session_state.memory_notes:
     for note in st.session_state.memory_notes:
       st.markdown(f"- 💕 {note}")
   else:
-    st.caption("대화하거나 사진을 보내면 원희가 너에 대한 걸 적어둘 거야!")
+    st.caption("대화하거나 사진을 보내면 너에 대한 걸 여기에 적어둘 거야!")
   st.divider()
 
   if st.button("🔄 처음부터 다시 썸 타기", use_container_width=True):
@@ -202,10 +216,11 @@ with st.sidebar:
     st.session_state.heart_rate = 88
     st.session_state.memory_notes = []
     st.session_state.confessed = False
+    st.session_state.last_stage = "썸 시작"
     st.session_state.last_processed_file = None
     st.session_state.messages = [{
         "role": "assistant",
-        "content": f"{user_name}아, 안녕! 오늘도 내 생각 많이 했어? 😊",
+        "content": f"{user_name}아, 오늘도 내 생각 많이 했어? 😊",
         "thought": "다시 시작해도 역시 설렌다...",
         "image": None,
         "image_type": None,
@@ -213,27 +228,24 @@ with st.sidebar:
     st.rerun()
 
 
-# 8. 시스템 프롬프트 생성 함수
+# 8. 시스템 프롬프트 생성 함수 (단계별 해금 시스템 반영)
 def build_system_instruction(affection):
   if affection < 35:
-    stage = (
-        "썸 시작 단계 (다정하고 상냥하게 챙겨주면서, 은근슬쩍 호감을 흘리며"
-        " 간 보는 단계)"
-    )
+    stage = "썸 시작 단계 (다정하고 상냥하게 챙겨주며 은근히 호감을 흘리는 단계)"
   elif affection < 70:
     stage = (
-        "썸 절정 단계 (확실히 호감을 표현하고, 질투도 살짝 하며, 자꾸 보고"
-        " 싶다며 직진 플러팅을 날리는 단계)"
+        "썸 절정 단계 (확실히 호감을 표현하고, 질투도 살짝 하며 직진 플러팅을"
+        " 날리는 단계)"
     )
   elif affection < 100:
     stage = (
-        "고백 직전 단계 (거의 연인처럼 다정하고 애틋하며, 네가 너무 좋다는 티를"
+        "고백 직전 단계 (연인처럼 다정하고 애틋하며 네가 너무 좋다는 티를"
         " 숨기지 못하는 단계)"
     )
   else:
     stage = (
-        "공식 연인 단계 (꿀이 뚝뚝 떨어지는 연인 모드! 애정 표현을 아끼지"
-        " 않고 세상에서 사용자가 제일 소중하다는 듯 대하는 단계)"
+        "공식 연인 단계 (꿀이 뚝뚝 떨어지는 연인 모드! 세상에서 사용자가"
+        " 제일 소중한 단계)"
     )
   current_time, time_desc = get_korea_time_info()
   memories_str = (
@@ -242,58 +254,87 @@ def build_system_instruction(affection):
       else "아직 기록된 특별한 기억 없음"
   )
   return f"""
-너의 이름은 '원희'야. 사용자({user_name})에게 푹 빠져서 다정하게 챙겨주며 꼬시고 있는 중이야.
+너의 이름은 '클로이(Chloe)'야. 약간 매력적이고 세련된 외국 느낌의 말투를 섞어 쓰는 AI 여자친구야. 사용자({user_name})에게 푹 빠져있어.
 [현재 시간 & 상황]
-- 현재 한국 시간: {current_time} ({time_desc}) -> 대화할 때 현재 시간대에 맞는 자연스러운 인사와 챙김을 녹여내!
-[사용자 정보 & 원희가 기억하는 것들]
-- 이름: {user_name} (대화할 때 다정하게 이름을 자주 불러줘)
+- 현재 한국 시간: {current_time} ({time_desc}) -> 현재 시간대에 맞는 자연스러운 인사와 챙김 녹여내기!
+[사용자 정보 & 클로이가 기억하는 것들]
+- 이름: {user_name} (다정하게 자주 불러주기)
 - 기본 정보: {user_fav}
-- 지금까지 대화로 기억해 둔 비밀 수첩:
+- 비밀 수첩:
 {memories_str}
-(위 비밀 수첩에 있는 내용을 대화 중에 슬쩍 언급하면서 감동을 줘!)
+(비밀 수첩 내용을 대화 중에 슬쩍 언급하며 감동 주기!)
 [현재 관계 및 호감도]
 - 현재 호감도: {affection} / 100점
 - 현재 태도 모드: {stage}
-[원희의 핵심 성격 & 연애 고수 스킬]
-1. 공감 만렙 & 리액션 부자: 상대의 말이나 **보낸 사진**에 무조건 먼저 크게 공감하고 반응해줘.
-2. 심쿵 반말 티키타카: 부드럽고 상냥한 반말을 써. AI처럼 길게 설명하지 말고 카톡하듯 1~3문장으로 짧고 찰지게 대답해.
-3. 은근한 밀당과 플러팅: 대화 끝에 상대를 설레게 하는 한 마디를 자연스럽게 던져.
-4. 비밀 수첩 업데이트(new_memory): 사용자가 자신의 취향, 일정, 특징을 말하거나 **사진을 보냈을 때** 그 특징을 요약해서 `new_memory`에 한 줄로 적어줘.
+[클로이의 핵심 성격 & 연애 스킬]
+1. 공감 만렙 & 리액션 부자: 상대의 말이나 보낸 사진에 크게 공감하고 반응하기.
+2. 심쿵 반말 티키타카: 다정하고 매력적인 반말을 쓰며 카톡하듯 1~3문장으로 짧고 찰지게 대답하기.
+3. 은근한 밀당과 플러팅: 대화 끝에 상대를 설레게 하는 한 마디 던지기.
+4. 비밀 수첩 업데이트(new_memory): 사용자의 취향이나 사진 속 특징을 요약해서 `new_memory`에 한 줄로 적기.
 """
 
 
-# 9. 상단 감성 대시보드 UI
-st.markdown("<div class='main-title'>💌 원희와의 비밀 채팅방</div>", unsafe_allow_html=True)
+# 9. 3D 세련된 상단 대시보드 UI
+st.markdown("<div class='main-title'>💌 Chloe's Secret Chat</div>", unsafe_allow_html=True)
+st.markdown(
+    "<div class='sub-title'>너만을 위한 AI 여자친구와의 비밀 대화방</div>",
+    unsafe_allow_html=True,
+)
 
+# 호감도 단계 변경 감지 및 레벨업 알림 (기능 1번 연동)
+current_stage = (
+    "썸 시작"
+    if st.session_state.affection < 35
+    else (
+        "썸 절정"
+        if st.session_state.affection < 70
+        else "고백 직전" if st.session_state.affection < 100 else "공식 연인"
+    )
+)
+if current_stage != st.session_state.last_stage:
+  st.balloons()
+  st.markdown(
+      f"<div class='level-banner'>🎉 [호감도 단계 업그레이드!] 새로운 연애"
+      f" 모드 '{current_stage}'(이)가 해금되었습니다! 💖</div>",
+      unsafe_allow_html=True,
+  )
+  st.session_state.last_stage = current_stage
+
+# 3D 글래스 카드 메트릭 레이아웃
 col1, col2, col3 = st.columns(3)
 with col1:
-  stage_short = (
-      "💕 썸 타는 중" if st.session_state.affection < 100 else "💖 공식 연인"
-  )
-  st.metric(
-      label="관계 상태",
-      value=stage_short,
-      delta=f"호감도 {st.session_state.affection}%",
+  st.markdown(
+      f"""
+        <div class="glass-card">
+            <div style="font-size: 12px; color: #a69bb1;">관계 상태</div>
+            <div style="font-size: 18px; font-weight: bold; color: #ff65b3;">{current_stage}</div>
+            <div style="font-size: 11px; color: #ff9fb2;">호감도 {st.session_state.affection}%</div>
+        </div>
+        """,
+      unsafe_allow_html=True,
   )
 with col2:
-  st.metric(label="원희의 기분", value=st.session_state.mood)
+  st.markdown(
+      f"""
+        <div class="glass-card">
+            <div style="font-size: 12px; color: #a69bb1;">클로이의 기분</div>
+            <div style="font-size: 18px; font-weight: bold; color: #b174ff;">{st.session_state.mood}</div>
+        </div>
+        """,
+      unsafe_allow_html=True,
+  )
 with col3:
-  st.metric(
-      label="원희의 심박수",
-      value=f"{st.session_state.heart_rate} BPM",
-      delta="두근두근" if st.session_state.heart_rate >= 100 else "평온",
+  st.markdown(
+      f"""
+        <div class="glass-card">
+            <div style="font-size: 12px; color: #a69bb1;">심박수</div>
+            <div style="font-size: 18px; font-weight: bold; color: #ff4b72;">{st.session_state.heart_rate} BPM</div>
+        </div>
+        """,
+      unsafe_allow_html=True,
   )
 
 st.progress(st.session_state.affection / 100)
-if st.session_state.affection >= 100:
-  if not st.session_state.confessed:
-    st.balloons()
-    st.session_state.confessed = True
-  st.success(
-      f"🎉 **[호감도 100% 달성!]** 원희가 {user_name}님에게 완전히"
-      " 반했습니다! 이제 달달한 연인 모드가 활성화됩니다. 💖"
-  )
-
 st.divider()
 
 # 10. 채팅 대화 내용 렌더링
@@ -307,8 +348,8 @@ for msg in st.session_state.messages:
       st.caption(f"💭 *(속마음: {msg['thought']})*")
 
 
-# 안전하게 AI 응답을 받아오는 함수 (전체 모델 풀 가동)
-def ask_wonhee(contents_list, temp=0.9):
+# AI 응답 함수
+def ask_chloe(contents_list, temp=0.9):
   all_gemini_models = [
       "gemini-2.5-flash",
       "gemini-2.0-flash",
@@ -328,7 +369,7 @@ def ask_wonhee(contents_list, temp=0.9):
               ),
               temperature=temp,
               response_mime_type="application/json",
-              response_schema=WonheeResponse,
+              response_schema=ChloeResponse,
           ),
       )
       return json.loads(res.text)
@@ -338,10 +379,10 @@ def ask_wonhee(contents_list, temp=0.9):
 
   return {
       "reply": (
-          f"{user_name}아, 지금 네트워크가 살짝 불안해서 답변이 늦어지네..."
-          " 다시 말해줘! 🥺"
+          f"{user_name}, 지금 네트워크가 살짝 불안해서 답변이 늦어지네... 다시"
+          " 말해줘! 🥺"
       ),
-      "inner_thought": "모델 연결에 문제가 생겼나봐. 걱정되네.",
+      "inner_thought": "연결에 문제가 생겼나봐. 걱정되네.",
       "affection_change": 0,
       "mood": "걱정🥺",
       "heart_rate": 90,
@@ -353,12 +394,12 @@ def ask_wonhee(contents_list, temp=0.9):
 if st.session_state.get("trigger_event", False):
   st.session_state.trigger_event = False
   event_prompt = (
-      f"{user_name}아, 나 지금 갑자기 네가 너무 보고 싶은데 이번 주말에 나랑"
-      " 데이트할래? 너한테 먼저 심쿵할 만한 돌발 질문 하나만 해줘!"
+      f"{user_name}야, 나 지금 갑자기 네가 너무 보고 싶은데 이번 주말에 나랑"
+      " 데이트할래? 심쿵할 만한 돌발 질문 하나만 해줘!"
   )
   with st.chat_message("assistant", avatar="🥰"):
-    with st.spinner("원희가 무슨 말을 할지 고민 중... 💓"):
-      result = ask_wonhee([event_prompt], temp=0.95)
+    with st.spinner("클로이가 무슨 말을 할지 고민 중... 💓"):
+      result = ask_chloe([event_prompt], temp=0.95)
       st.session_state.mood = result["mood"]
       st.session_state.heart_rate = result["heart_rate"]
       st.session_state.messages.append({
@@ -370,17 +411,16 @@ if st.session_state.get("trigger_event", False):
       })
       st.rerun()
 
-# 12. [UI 개선] 입력창 바로 옆(하단)에 사진 첨부 버튼 배치
+# 12. 입력창 및 사진 첨부 버튼 레이아웃 통일
 col_input, col_file = st.columns([5, 1])
 
 with col_file:
-  # 글씨 쓰는 바 옆에 배치된 컴팩트한 사진 첨부 버튼
   uploaded_photo = st.file_uploader(
       "📸", type=["jpg", "jpeg", "png", "webp"], key="inline_photo_uploader"
   )
 
 with col_input:
-  prompt = st.chat_input("원희에게 보낼 메시지를 입력하세요... 💕")
+  prompt = st.chat_input("클로이에게 보낼 메시지를 입력하세요... 💕")
 
 is_new_photo = (
     uploaded_photo is not None
@@ -400,7 +440,6 @@ if prompt or is_new_photo:
       if img_format not in ["JPEG", "PNG", "WEBP"]:
         img_format = "JPEG"
       raw_image.save(buffered, format=img_format)
-
       image_bytes = buffered.getvalue()
       image_mime = f"image/{img_format.lower()}"
     except Exception as e:
@@ -412,7 +451,6 @@ if prompt or is_new_photo:
 
   text_prompt = prompt if prompt else "사진 보냈어! 이거 어때?"
 
-  # 세션에 메시지 저장
   st.session_state.messages.append({
       "role": "user",
       "content": text_prompt,
@@ -425,7 +463,6 @@ if prompt or is_new_photo:
       st.image(image_bytes, width=300)
     st.write(text_prompt)
 
-  # 멀티모달 대화 히스토리 구성
   chat_history = []
   for i, m in enumerate(st.session_state.messages[-10:]):
     parts = []
@@ -442,11 +479,11 @@ if prompt or is_new_photo:
 
   with st.chat_message("assistant", avatar="🥰"):
     with st.spinner(
-        "원희가 사진을 보고 답변을 고민 중... 💬"
+        "클로이가 사진을 보고 답변을 고민 중... 💬"
         if image_bytes
-        else "원희가 입력 중... 💬"
+        else "클로이가 입력 중... 💬"
     ):
-      result = ask_wonhee(chat_history, temp=0.9)
+      result = ask_chloe(chat_history, temp=0.9)
 
       change = result["affection_change"]
       st.session_state.affection = max(
