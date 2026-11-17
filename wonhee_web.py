@@ -240,9 +240,14 @@ for msg in st.session_state.messages:
       st.caption(f"💭 *(속마음: {msg['thought']})*")
 
 
-# 안전하게 AI 응답을 받아오는 함수 (from_bytes 규격 적용)
+# 안전하게 AI 응답을 받아오는 함수 (최신 모델 반영)
 def ask_wonhee(contents_list, temp=0.9):
-  for model_name in ["gemini-2.5-flash", "gemini-2.5-pro"]:
+  # 최신 제미나이 3.5 / 3.8 / 2.5 플래시 모델 순차 적용
+  for model_name in [
+      "gemini-3.8-flash",
+      "gemini-3.5-flash",
+      "gemini-2.5-flash",
+  ]:
     try:
       res = client.models.generate_content(
           model=model_name,
@@ -295,7 +300,7 @@ if st.session_state.get("trigger_event", False):
       })
       st.rerun()
 
-# 11. 채팅 입력창 (from_bytes 방식을 이용한 안전한 멀티모달 전송)
+# 11. 채팅 입력창
 prompt = st.chat_input("원희에게 보낼 메시지를 입력하세요... 💕")
 
 is_new_photo = (
@@ -335,12 +340,11 @@ if prompt or is_new_photo:
       st.image(image_bytes, width=300)
     st.write(text_prompt)
 
-  # 최신 SDK 규격에 맞는 chat_history 구성 (from_bytes 활용)
+  # 최신 SDK 규격에 맞는 멀티모달 대화 히스토리 구성
   chat_history = []
-  for m in st.session_state.messages[-10:]:
+  for i, m in enumerate(st.session_state.messages[-10:]):
     parts = []
-    # 방금 보낸 최신 메시지이고 이미지가 있는 경우 바이트 파트로 추가
-    if m.get("image") and m == st.session_state.messages[-1]:
+    if i == len(st.session_state.messages[-10:]) - 1 and m.get("image"):
       mime = m.get("image_type", "image/jpeg")
       parts.append(types.Part.from_bytes(data=m["image"], mime_type=mime))
 
