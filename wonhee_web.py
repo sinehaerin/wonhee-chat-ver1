@@ -1,13 +1,13 @@
 from datetime import datetime, timezone, timedelta
 import io
 import json
+from PIL import Image
 import streamlit as st
 from google import genai
 from google.genai import types
-from PIL import Image
 from pydantic import BaseModel, Field
 
-# 1. 클라우드 Secrets에서 API 키 불러오기 (로컬 테스트 시 예외 처리 포함)
+# 1. 클라우드 Secrets에서 API 키 불러오기
 try:
   API_KEY = st.secrets["GEMINI_API_KEY"]
 except Exception:
@@ -15,9 +15,46 @@ except Exception:
 
 client = genai.Client(api_key=API_KEY)
 
-# 2. 페이지 기본 설정
+# 2. 페이지 기본 설정 (와이드 레이아웃 적용 및 감성적인 타이틀)
 st.set_page_config(
     page_title="원희와의 비밀 채팅방 💕", page_icon="💌", layout="centered"
+)
+
+# 🎨 [디자인 개선] 커스텀 CSS 적용 (카톡 스타일 및 예쁜 핑크 감성 UI)
+st.markdown(
+    """
+    <style>
+    /* 전체 배경 및 폰트 부드럽게 */
+    .stApp {
+        background-color: #0e1117;
+        color: #f0f2f6;
+    }
+    /* 상단 대시보드 카드 스타일 */
+    .metric-card {
+        background: linear-gradient(135deg, #1e1e2f 0%, #2a1b3d 100%);
+        border: 1px solid #ff4b7255;
+        padding: 15px;
+        border-radius: 15px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(255, 75, 114, 0.1);
+    }
+    /* 타이틀 감성 스타일 */
+    .main-title {
+        font-size: 28px;
+        font-weight: 800;
+        background: -webkit-linear-gradient(45deg, #ff4b72, #ff8da1);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-align: center;
+        margin-bottom: 5px;
+    }
+    /* 캡션 및 속마음 스타일 */
+    .stCaption {
+        color: #ff9fb2 !important;
+    }
+    </style>
+""",
+    unsafe_allow_html=True,
 )
 
 
@@ -61,25 +98,25 @@ def get_korea_time_info():
   now = datetime.now(kst)
   hour = now.hour
   if 5 <= hour < 11:
-    time_desc = "아침 시간대 (출근/등교, 모닝콜, 아침밥 챙겨주기 좋은 시간)"
+    time_desc = "아침 시간대 (모닝콜, 아침밥 챙겨주기 좋은 시간)"
   elif 11 <= hour < 14:
     time_desc = "점심 시간대 (점심 메뉴 물어보기, 오후 응원하기 좋은 시간)"
   elif 14 <= hour < 18:
     time_desc = "오후 시간대 (나른함 달래주기, 커피 한잔 챙겨주기 좋은 시간)"
   elif 18 <= hour < 23:
-    time_desc = (
-        "저녁/밤 시간대 (하루 고생 위로하기, 퇴근길 챙기기, 데이트 얘기하기"
-        " 좋은 시간)"
-    )
+    time_desc = "저녁/밤 시간대 (하루 고생 위로하기, 데이트 얘기하기 좋은 시간)"
   else:
     time_desc = (
-        "새벽 감성 시간대 (감수성 풍부해지고, 왜 안 자냐며 은근히 설레는 멘트"
-        " 치기 딱 좋은 시간)"
+        "새벽 감성 시간대 (감수성 풍부해지고 설레는 멘트 치기 딱 좋은 시간)"
     )
   return now.strftime("%Y년 %m월 %d일 %H시 %M분"), time_desc
 
 
 # 5. 세션 상태 초기화
+if "user_name" not in st.session_state:
+  st.session_state.user_name = ""
+if "user_fav" not in st.session_state:
+  st.session_state.user_fav = "맛있는 거 먹기, 영화 보기"
 if "affection" not in st.session_state:
   st.session_state.affection = 30
 if "mood" not in st.session_state:
@@ -93,44 +130,70 @@ if "confessed" not in st.session_state:
 if "last_processed_file" not in st.session_state:
   st.session_state.last_processed_file = None
 if "messages" not in st.session_state:
-  st.session_state.messages = [{
-      "role": "assistant",
-      "content": "안녕! 뭐해? 자꾸 네 생각 나서 먼저 연락했지~ 오늘 하루 잘 보냈어? 😊",
-      "thought": "먼저 연락했는데 좋아해 줬으면 좋겠다... 심장 떨리네.",
-      "image": None,
-      "image_type": None,
-  }]
+  st.session_state.messages = []
 
-# 6. 사이드바 설정
+
+# 6. [신규 기능] 첫 접속 시 이름 물어보기 팝업 모달
+@st.dialog("💌 원희와의 첫 만남")
+def ask_user_name_modal():
+  st.markdown(
+      "<h3 style='text-align: center; color: #ff4b72;'>안녕? 😳</h3>",
+      unsafe_allow_html=True,
+  )
+  st.write(
+      "우리 대화하기 전에, 원희가 너를 뭐라고 부르면 될까? 네 이름을"
+      " 알려줘! 💕"
+  )
+  name_input = st.text_input("내 이름 (또는 애칭)", value="지훈")
+  fav_input = st.text_input(
+      "평소 좋아하는 취향이나 특징", value="맛있는 거 먹기, 영화 보기"
+  )
+
+  if st.button("원희하러 가기 💖", use_container_width=True):
+    if name_input.strip():
+      st.session_state.user_name = name_input.strip()
+      st.session_state.user_fav = fav_input.strip()
+      # 초기 첫 인사 메시지 설정
+      st.session_state.messages = [{
+          "role": "assistant",
+          "content": (
+              f"안녕, {st.session_state.user_name}아! 뭐해? 자꾸 네 생각 나서"
+              " 먼저 연락했지~ 오늘 하루 잘 보냈어? 😊"
+          ),
+          "thought": "먼저 연락했는데 좋아해 줬으면 좋겠다... 심장 떨리네.",
+          "image": None,
+          "image_type": None,
+      }]
+      st.rerun()
+
+
+# 이름이 설정되지 않았다면 모달 띄우기
+if not st.session_state.user_name:
+  ask_user_name_modal()
+  st.stop()  # 이름 입력 전까지 아래 코드 일시 중지
+
+user_name = st.session_state.user_name
+user_fav = st.session_state.user_fav
+
+
+# 7. 사이드바 설정 (깔끔하게 정돈된 프로필 및 수첩)
 with st.sidebar:
-  st.header("⚙️ 내 프로필 & 설정")
-  user_name = st.text_input("내 이름 (원희가 부를 호칭)", value="지훈")
-  user_fav = st.text_input("기본 취향/성격", value="맛있는 거 먹기, 영화 보기")
+  st.markdown("### ⚙️ 설정 & 비밀 수첩")
   show_thought = st.toggle("💭 원희의 속마음 훔쳐보기", value=True)
   st.divider()
 
-  st.subheader("📸 원희에게 사진 보내기")
-  uploaded_photo = st.file_uploader(
-      "오늘 먹은 음식, 풍경 등을 공유해보세요!",
-      type=["jpg", "jpeg", "png", "webp"],
-      key="photo_uploader",
-  )
-  st.divider()
-
-  st.subheader("🎲 돌발 이벤트")
-  if st.button("✨ 원희의 심쿵 돌발 질문 받기", use_container_width=True):
+  # 돌발 심쿵 이벤트 트리거 버튼
+  if st.button("🎲 원희의 심쿵 돌발 질문 받기", use_container_width=True):
     st.session_state.trigger_event = True
   st.divider()
 
-  st.subheader("📒 원희의 비밀 수첩 (기억 노트)")
+  # 원희의 비밀 수첩
+  st.markdown("### 📒 원희의 비밀 수첩")
   if st.session_state.memory_notes:
     for note in st.session_state.memory_notes:
       st.markdown(f"- 💕 {note}")
   else:
-    st.caption(
-        "대화를 나누거나 사진을 보내면 원희가 너에 대한 사소한 것들을 여기에"
-        " 몰래 적어둘 거야!"
-    )
+    st.caption("대화하거나 사진을 보내면 원희가 너에 대한 걸 적어둘 거야!")
   st.divider()
 
   if st.button("🔄 처음부터 다시 썸 타기", use_container_width=True):
@@ -150,7 +213,7 @@ with st.sidebar:
     st.rerun()
 
 
-# 7. 시스템 프롬프트 생성 함수
+# 8. 시스템 프롬프트 생성 함수
 def build_system_instruction(affection):
   if affection < 35:
     stage = (
@@ -199,8 +262,9 @@ def build_system_instruction(affection):
 """
 
 
-# 8. 상단 대시보드
-st.title("💌 원희")
+# 9. 상단 감성 대시보드 UI
+st.markdown("<div class='main-title'>💌 원희와의 비밀 채팅방</div>", unsafe_allow_html=True)
+
 col1, col2, col3 = st.columns(3)
 with col1:
   stage_short = (
@@ -212,13 +276,14 @@ with col1:
       delta=f"호감도 {st.session_state.affection}%",
   )
 with col2:
-  st.metric(label="원희의 현재 기분", value=st.session_state.mood)
+  st.metric(label="원희의 기분", value=st.session_state.mood)
 with col3:
   st.metric(
       label="원희의 심박수",
       value=f"{st.session_state.heart_rate} BPM",
       delta="두근두근" if st.session_state.heart_rate >= 100 else "평온",
   )
+
 st.progress(st.session_state.affection / 100)
 if st.session_state.affection >= 100:
   if not st.session_state.confessed:
@@ -229,7 +294,9 @@ if st.session_state.affection >= 100:
       " 반했습니다! 이제 달달한 연인 모드가 활성화됩니다. 💖"
   )
 
-# 9. 기존 채팅 말풍선 화면에 그리기
+st.divider()
+
+# 10. 채팅 대화 내용 렌더링
 for msg in st.session_state.messages:
   avatar = "🥰" if msg["role"] == "assistant" else "🧑"
   with st.chat_message(msg["role"], avatar=avatar):
@@ -240,14 +307,17 @@ for msg in st.session_state.messages:
       st.caption(f"💭 *(속마음: {msg['thought']})*")
 
 
-# 안전하게 AI 응답을 받아오는 함수 (최신 모델 반영)
+# 안전하게 AI 응답을 받아오는 함수 (전체 모델 풀 가동)
 def ask_wonhee(contents_list, temp=0.9):
-  # 최신 제미나이 3.5 / 3.8 / 2.5 플래시 모델 순차 적용
-  for model_name in [
-      "gemini-3.8-flash",
-      "gemini-3.5-flash",
+  all_gemini_models = [
       "gemini-2.5-flash",
-  ]:
+      "gemini-2.0-flash",
+      "gemini-2.5-pro",
+      "gemini-2.0-pro",
+      "gemini-flash",
+      "gemini-pro",
+  ]
+  for model_name in all_gemini_models:
     try:
       res = client.models.generate_content(
           model=model_name,
@@ -263,15 +333,15 @@ def ask_wonhee(contents_list, temp=0.9):
       )
       return json.loads(res.text)
     except Exception as e:
-      print(f"API Error ({model_name}): {e}")
+      print(f"Model {model_name} Error: {e}")
       continue
 
   return {
       "reply": (
-          f"{user_name}아, 보낸 사진을 불러오는 중에 살짝 문제가 생겼어! 🥺"
-          " 다시 보여줄래?"
+          f"{user_name}아, 지금 네트워크가 살짝 불안해서 답변이 늦어지네..."
+          " 다시 말해줘! 🥺"
       ),
-      "inner_thought": "사진 처리 중에 에러가 났나봐. 아쉽다.",
+      "inner_thought": "모델 연결에 문제가 생겼나봐. 걱정되네.",
       "affection_change": 0,
       "mood": "걱정🥺",
       "heart_rate": 90,
@@ -279,7 +349,7 @@ def ask_wonhee(contents_list, temp=0.9):
   }
 
 
-# 10. 돌발 이벤트 처리
+# 11. 돌발 이벤트 처리
 if st.session_state.get("trigger_event", False):
   st.session_state.trigger_event = False
   event_prompt = (
@@ -300,8 +370,17 @@ if st.session_state.get("trigger_event", False):
       })
       st.rerun()
 
-# 11. 채팅 입력창
-prompt = st.chat_input("원희에게 보낼 메시지를 입력하세요... 💕")
+# 12. [UI 개선] 입력창 바로 옆(하단)에 사진 첨부 버튼 배치
+col_input, col_file = st.columns([5, 1])
+
+with col_file:
+  # 글씨 쓰는 바 옆에 배치된 컴팩트한 사진 첨부 버튼
+  uploaded_photo = st.file_uploader(
+      "📸", type=["jpg", "jpeg", "png", "webp"], key="inline_photo_uploader"
+  )
+
+with col_input:
+  prompt = st.chat_input("원희에게 보낼 메시지를 입력하세요... 💕")
 
 is_new_photo = (
     uploaded_photo is not None
@@ -313,16 +392,22 @@ if prompt or is_new_photo:
   image_mime = None
 
   if is_new_photo:
-    image_bytes = uploaded_photo.getvalue()
-    image_mime = uploaded_photo.type
-    if not image_mime or image_mime not in [
-        "image/jpeg",
-        "image/png",
-        "image/webp",
-        "image/heic",
-        "image/heif",
-    ]:
-      image_mime = "image/jpeg"
+    try:
+      raw_image = Image.open(uploaded_photo)
+      raw_image.thumbnail((1024, 1024))
+      buffered = io.BytesIO()
+      img_format = raw_image.format if raw_image.format else "JPEG"
+      if img_format not in ["JPEG", "PNG", "WEBP"]:
+        img_format = "JPEG"
+      raw_image.save(buffered, format=img_format)
+
+      image_bytes = buffered.getvalue()
+      image_mime = f"image/{img_format.lower()}"
+    except Exception as e:
+      print(f"Image Compression Error: {e}")
+      image_bytes = uploaded_photo.getvalue()
+      image_mime = uploaded_photo.type or "image/jpeg"
+
     st.session_state.last_processed_file = uploaded_photo
 
   text_prompt = prompt if prompt else "사진 보냈어! 이거 어때?"
@@ -340,7 +425,7 @@ if prompt or is_new_photo:
       st.image(image_bytes, width=300)
     st.write(text_prompt)
 
-  # 최신 SDK 규격에 맞는 멀티모달 대화 히스토리 구성
+  # 멀티모달 대화 히스토리 구성
   chat_history = []
   for i, m in enumerate(st.session_state.messages[-10:]):
     parts = []
