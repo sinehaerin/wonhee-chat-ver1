@@ -219,22 +219,25 @@ JSON_KEYS_HINT = (
 # ------------------------------------------------------------------
 # 4. 한국 현재 시간(KST)
 # ------------------------------------------------------------------
-def get_korea_time_info():
-  kst = timezone(timedelta(hours=9))
-  now = datetime.now(kst)
-  시간 = now.hour
-  5시 이하, 11시 미만인 경우:
-    time_desc = "아침 식사(모닝콜, 아침밥을 먹는 주기 좋은 시간)"
-  11시 ≤ 시간 < 14시인 경우:
-    time_desc = "점심 메뉴 (점심 메뉴 물어보기, 오후 응원하기 좋은 시간)"
-  14시 ≤ 시간 < 18시인 경우:
-    time_desc = "오후 식사 (나른함 달래주기, 식사 시간을 위한 시간)"
-  18시 ≤ 시간 ≤ 23시인 경우:
-    time_desc = "저녁/밤낮 (하루를 보내기 위해, 데이트하기 좋은 시간)"
-  그렇지 않으면:
-    time_desc = "새벽 감정 반응 (감수성 동기가 흥분되는 멘트 치기 좋은 시간)"
-  return now.strftime("%Y년 %m월 %d일 %H시 %M분"), time_desc
+from datetime import datetime, timezone, timedelta
 
+def get_korea_time_info():
+    kst = timezone(timedelta(hours=9))
+    now = datetime.now(kst)
+    hour = now.hour
+
+    if 5 <= hour < 11:
+        time_desc = "아침 식사(모닝콜, 아침밥을 먹기 좋은 시간)"
+    elif 11 <= hour < 14:
+        time_desc = "점심 메뉴 (점심 메뉴 물어보기, 오후 응원하기 좋은 시간)"
+    elif 14 <= hour < 18:
+        time_desc = "오후 식사 (나른함 달래주기, 식사 시간을 위한 시간)"
+    elif 18 <= hour <= 23:
+        time_desc = "저녁/밤낮 (하루를 마무리하며, 데이트하기 좋은 시간)"
+    else:
+        time_desc = "새벽 감정 반응 (감수성 동기가 흥분되는 멘트 치기 좋은 시간)"
+
+    return now.strftime("%Y년 %m월 %d일 %H시 %M분"), time_desc
 
 # ------------------------------------------------------------------
 # 5. 세션 상태
