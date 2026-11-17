@@ -259,44 +259,51 @@ if st.session_state.get("trigger_event", False):
 if prompt := st.chat_input(f"원희에게 보낼 메시지를 입력하세요... 💕"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user", avatar="🧑"):
-    st.write(prompt)
+        st.write(prompt)
+
     chat_history = [
-    types.Content(
-    role="user" if m["role"] == "user" else "model",
-    parts=[types.Part.from_text(text=m["content"])]
-    )
-    for m in st.session_state.messages[-12:]
+        types.Content(
+            role="user" if m["role"] == "user" else "model",
+            parts=[types.Part.from_text(text=m["content"])]
+        )
+        for m in st.session_state.messages[-12:]
     ]
+
     with st.chat_message("assistant", avatar="🥰"):
-    with st.spinner("원희가 입력 중... 💬"):
-    response = client.models.generate_content(
-    model="gemini-2.5-flash",
-    contents=chat_history,
-    config=types.GenerateContentConfig(
-    system_instruction=build_system_instruction(st.session_state.affection),
-    temperature=0.9,
-    response_mime_type="application/json",
-    response_schema=WonheeResponse,
-    )
-    )
-    result = json.loads(response.text)
-    # 호감도, 기분, 심박수 업데이트
-    change = result["affection_change"]
-    st.session_state.affection = max(0, min(100, st.session_state.affection + change))
-    st.session_state.mood = result["mood"]
-    st.session_state.heart_rate = result["heart_rate"]
-    # 새로운 기억이 추출되었다면 비밀 수첩에 자동 추가
-    new_mem = result.get("new_memory", "").strip()
-    if new_mem and new_mem not in st.session_state.memory_notes:
-    st.session_state.memory_notes.append(new_mem)
-    # 답변 출력
-    st.write(result["reply"])
-    if show_thought:
-    change_str = f"+{change}" if change >= 0 else f"{change}"
-    st.caption(f"💭 (속마음: {result['inner_thought']}) | 💖 호감도 {change_str}%")
-    st.session_state.messages.append({
-    "role": "assistant",
-    "content": result["reply"],
-    "thought": result["inner_thought"]
-    })
-    st.rerun()
+        with st.spinner("원희가 입력 중... 💬"):
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=chat_history,
+                config=types.GenerateContentConfig(
+                    system_instruction=build_system_instruction(st.session_state.affection),
+                    temperature=0.9,
+                    response_mime_type="application/json",
+                    response_schema=WonheeResponse,
+                )
+            )
+            result = json.loads(response.text)
+
+            # 호감도, 기분, 심박수 업데이트
+            change = result["affection_change"]
+            st.session_state.affection = max(0, min(100, st.session_state.affection + change))
+            st.session_state.mood = result["mood"]
+            st.session_state.heart_rate = result["heart_rate"]
+
+            # 새로운 기억이 추출되었다면 비밀 수첩에 자동 추가
+            new_mem = result.get("new_memory", "").strip()
+            if new_mem and new_mem not in st.session_state.memory_notes:
+                st.session_state.memory_notes.append(new_mem)
+
+            # 답변 출력
+            st.write(result["reply"])
+            if show_thought:
+                change_str = f"+{change}" if change >= 0 else f"{change}"
+                st.caption(f"💭 *(속마음: {result['inner_thought']})* | 💖 호감도 {change_str}%")
+
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": result["reply"],
+                "thought": result["inner_thought"]
+            })
+            st.rerun()
+        
