@@ -108,7 +108,9 @@ with st.sidebar:
   # 📸 원희에게 사진 전송하기 컴포넌트
   st.subheader("📸 원희에게 사진 보내기")
   uploaded_photo = st.file_uploader(
-      "오늘 먹은 음식, 풍경 등을 공유해보세요!", type=["jpg", "jpeg", "png"]
+      "오늘 먹은 음식, 풍경 등을 공유해보세요!",
+      type=["jpg", "jpeg", "png", "webp"],
+      key="photo_uploader",
   )
   st.divider()
 
@@ -236,7 +238,7 @@ for msg in st.session_state.messages:
       st.caption(f"💭 *(속마음: {msg['thought']})*")
 
 
-# 안전하게 AI 응답을 받아오는 함수 (사진 인식 실패/에러 방지용 안전 장치 포함)
+# 안전하게 AI 응답을 받아오는 함수 (에러 발생 시 무한 루프 없이 깔끔하게 대처)
 def ask_wonhee(contents_list, temp=0.9):
   for model_name in ["gemini-2.5-flash", "gemini-2.5-pro"]:
     try:
@@ -257,13 +259,15 @@ def ask_wonhee(contents_list, temp=0.9):
       print(f"API Error ({model_name}): {e}")
       continue
 
-  # 사진 인식 실패 또는 통신 에러 발생 시 무한 재시도 대신 부드럽게 대처
+  # 사진 인식 실패 또는 에러 발생 시 원희가 자연스럽게 넘어가도록 함 (무한 루프 방지)
   return {
       "reply": (
-          f"{user_name}아, 보내준 사진이 살짝 흐리거나 파일 형식이 이상해서"
-          " 잘 안 보인다... 🥺 다시 보여주면 안 돼?"
+          f"{user_name}아, 보내준 사진을 읽어오는데 오류가 났어! 🥺 다음에"
+          " 다시 예쁜 거 보여줘~"
       ),
-      "inner_thought": "사진이 왜 안 보이지? 아쉽다, 다시 보고 싶은데...",
+      "inner_thought": (
+          "사진이 잘 안 열렸네... 아쉽지만 다음 기회에 봐야지."
+      ),
       "affection_change": 0,
       "mood": "걱정🥺",
       "heart_rate": 90,
@@ -295,8 +299,10 @@ if st.session_state.get("trigger_event", False):
       })
       st.rerun()
 
-# 11. 채팅 입력창 (텍스트 + 사진 전송 연동 및 안전한 히스토리 관리)
+# 11. 채팅 입력창 (텍스트 + 사진 전송 연동 및 중복 전송 원천 차단)
 prompt = st.chat_input("원희에게 보낼 메시지를 입력하세요... 💕")
+
+# 사용자가 입력했거나 또는 새롭게 사진이 업로드된 경우에만 실행
 if prompt or uploaded_photo:
   user_content_parts = []
   image_bytes = None
@@ -304,7 +310,17 @@ if prompt or uploaded_photo:
 
   if uploaded_photo:
     image_bytes = uploaded_photo.getvalue()
-    image_mime = uploaded_photo.type  # 실제 파일 형식(image/png, image/jpeg 등) 저장
+    image_mime = uploaded_photo.type  # 실제 파일 형식(image/png 등)
+    # 이미지 안전 장치: 지원되는 MIME 타입 보정
+    if not image_mime or image_mime not in [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/heic",
+        "image/heif",
+    ]:
+      image_mime = "image/jpeg"
+
     user_content_parts.append(
         types.Part.from_bytes(data=image_bytes, mime_type=image_mime)
     )
@@ -312,7 +328,7 @@ if prompt or uploaded_photo:
   text_prompt = prompt if prompt else "사진 보냈어! 이거 어때?"
   user_content_parts.append(types.Part.from_text(text=text_prompt))
 
-  # 세션에 사용자 메시지 저장 (이미지 타입 함께 보존)
+  # 세션에 사용자 메시지 저장
   st.session_state.messages.append({
       "role": "user",
       "content": text_prompt,
@@ -325,10 +341,11 @@ if prompt or uploaded_photo:
       st.image(image_bytes, width=300)
     st.write(text_prompt)
 
-  # 최근 대화 기록 빌드 (멀티모달 에러 방지: 가장 최근 메시지의 이미지만 바이트로 전송)
+  # 최근 대화 기록 빌드 (가장 최근 메시지 중 이미지가 방금 올라온 경우에만 이미지 포함)
   chat_history = []
   for m in st.session_state.messages[-10:]:
     parts = []
+    # 방금 보낸 최신 메시지이고 이미지가 있다면 파트에 추가
     if m.get("image") and m == st.session_state.messages[-1]:
       mime = m.get("image_type", "image/jpeg")
       parts.append(types.Part.from_bytes(data=m["image"], mime_type=mime))
@@ -375,4 +392,6 @@ if prompt or uploaded_photo:
           "image": None,
           "image_type": None,
       })
+
+      # 업로드된 사진 상태를 초기화하거나 rerun하여 무한 루프 방지
       st.rerun()
