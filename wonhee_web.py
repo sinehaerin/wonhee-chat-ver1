@@ -1,5 +1,7 @@
 from datetime import datetime, timezone, timedelta
+import io
 import json
+from PIL import Image
 import streamlit as st
 from google import genai
 from google.genai import types
@@ -89,14 +91,13 @@ if "memory_notes" not in st.session_state:
 if "confessed" not in st.session_state:
   st.session_state.confessed = False
 if "last_processed_file" not in st.session_state:
-  st.session_state.last_processed_file = None  # 중복 업로드 방지용 키
+  st.session_state.last_processed_file = None
 if "messages" not in st.session_state:
   st.session_state.messages = [{
       "role": "assistant",
       "content": "안녕! 뭐해? 자꾸 네 생각 나서 먼저 연락했지~ 오늘 하루 잘 보냈어? 😊",
       "thought": "먼저 연락했는데 좋아해 줬으면 좋겠다... 심장 떨리네.",
       "image": None,
-      "image_type": None,
   }]
 
 # 6. 사이드바: 프로필, 사진 보내기 기능, 비밀 수첩, 돌발 이벤트
@@ -122,7 +123,7 @@ with st.sidebar:
     st.session_state.trigger_event = True
   st.divider()
 
-  # 원희의 비밀 수첩 (대화 중 자동 추출된 장기 기억)
+  # 원희의 비밀 수첩
   st.subheader("📒 원희의 비밀 수첩 (기억 노트)")
   if st.session_state.memory_notes:
     for note in st.session_state.memory_notes:
@@ -146,7 +147,6 @@ with st.sidebar:
         "content": f"{user_name}아, 안녕! 오늘도 내 생각 많이 했어? 😊",
         "thought": "다시 시작해도 역시 설렌다...",
         "image": None,
-        "image_type": None,
     }]
     st.rerun()
 
@@ -230,7 +230,7 @@ if st.session_state.affection >= 100:
       " 반했습니다! 이제 달달한 연인 모드가 활성화됩니다. 💖"
   )
 
-# 9. 기존 채팅 말풍선 화면에 그리기 (사진 포함)
+# 9. 기존 채팅 말풍선 화면에 그리기
 for msg in st.session_state.messages:
   avatar = "🥰" if msg["role"] == "assistant" else "🧑"
   with st.chat_message(msg["role"], avatar=avatar):
@@ -241,7 +241,7 @@ for msg in st.session_state.messages:
       st.caption(f"💭 *(속마음: {msg['thought']})*")
 
 
-# 안전하게 AI 응답을 받아오는 함수
+# 안전하게 AI 응답을 받아오는 함수 (PIL 이미지 객체를 직접 contents에 전달하는 안정적인 방식)
 def ask_wonhee(contents_list, temp=0.9):
   for model_name in ["gemini-2.5-flash", "gemini-2.5-pro"]:
     try:
@@ -262,15 +262,11 @@ def ask_wonhee(contents_list, temp=0.9):
       print(f"API Error ({model_name}): {e}")
       continue
 
-  # 사진 인식 실패 또는 에러 발생 시 원희가 자연스럽게 넘어가도록 함
   return {
       "reply": (
-          f"{user_name}아, 보내준 사진을 읽어오는데 오류가 났어! 🥺 다음에"
-          " 다시 예쁜 거 보여줘~"
+          f"{user_name}아, 사진이 잘 안 열리네... 🥺 다시 한번 보내줄래?"
       ),
-      "inner_thought": (
-          "사진이 잘 안 열렸네... 아쉽지만 다음 기회에 봐야지."
-      ),
+      "inner_thought": "사진 로딩에 실패했어. 아쉽다...",
       "affection_change": 0,
       "mood": "걱정🥺",
       "heart_rate": 90,
@@ -287,10 +283,7 @@ if st.session_state.get("trigger_event", False):
   )
   with st.chat_message("assistant", avatar="🥰"):
     with st.spinner("원희가 무슨 말을 할지 고민 중... 💓"):
-      result = ask_wonhee(
-          [types.Content(role="user", parts=[types.Part.from_text(text=event_prompt)])],
-          temp=0.95,
-      )
+      result = ask_wonhee([event_prompt], temp=0.95)
       st.session_state.mood = result["mood"]
       st.session_state.heart_rate = result["heart_rate"]
       st.session_state.messages.append({
@@ -298,14 +291,12 @@ if st.session_state.get("trigger_event", False):
           "content": result["reply"],
           "thought": result["inner_thought"],
           "image": None,
-          "image_type": None,
       })
       st.rerun()
 
-# 11. 채팅 입력창 (텍스트 + 사진 전송 연동 및 중복 전송 원천 차단)
+# 11. 채팅 입력창 (PIL을 이용한 강력하고 안전한 멀티모달 입력)
 prompt = st.chat_input("원희에게 보낼 메시지를 입력하세요... 💕")
 
-# 실제로새로운 사진이 업로드되었는지 확인 (이전에 이미 처리한 사진이면 무시)
 is_new_photo = (
     uploaded_photo is not None
     and uploaded_photo != st.session_state.last_processed_file
@@ -313,30 +304,26 @@ is_new_photo = (
 
 if prompt or is_new_photo:
   image_bytes = None
-  image_mime = None
+  pil_img = None
 
   if is_new_photo:
     image_bytes = uploaded_photo.getvalue()
-    image_mime = uploaded_photo.type
-    if not image_mime or image_mime not in [
-        "image/jpeg",
-        "image/png",
-        "image/webp",
-        "image/heic",
-        "image/heif",
-    ]:
-      image_mime = "image/jpeg"
-    # 현재 처리한 사진으로 기록하여 중복 전송 방지
+    try:
+      # PIL 이미지로 변환하여 제미나이 SDK가 가장 완벽하게 인식하도록 처리
+      pil_img = Image.open(io.BytesIO(image_bytes))
+    except Exception as err:
+      print(f"Image Load Error: {err}")
+      pil_img = None
+
     st.session_state.last_processed_file = uploaded_photo
 
   text_prompt = prompt if prompt else "사진 보냈어! 이거 어때?"
 
-  # 세션에 사용자 메시지 저장
+  # 세션에 메시지 저장 (이미지 바이트 보존)
   st.session_state.messages.append({
       "role": "user",
       "content": text_prompt,
       "image": image_bytes,
-      "image_type": image_mime,
   })
 
   with st.chat_message("user", avatar="🧑"):
@@ -344,28 +331,27 @@ if prompt or is_new_photo:
       st.image(image_bytes, width=300)
     st.write(text_prompt)
 
-  # 최근 대화 기록 빌드
-  chat_history = []
-  for m in st.session_state.messages[-10:]:
-    parts = []
-    if m.get("image") and m == st.session_state.messages[-1]:
-      mime = m.get("image_type", "image/jpeg")
-      parts.append(types.Part.from_bytes(data=m["image"], mime_type=mime))
-
-    parts.append(types.Part.from_text(text=m["content"]))
-    chat_history.append(
-        types.Content(
-            role="user" if m["role"] == "user" else "model", parts=parts
-        )
+  # 최신 대화 전송 컨텐츠 구성 (최신 메시지에만 PIL 이미지 또는 텍스트 결합)
+  chat_contents = []
+  # 히스토리 중 최근 몇 개만 문자열/텍스트로 구성하되, 마지막이 이미지면 PIL 객체 추가
+  for m in st.session_state.messages[-6:]:
+    chat_contents.append(
+        f"{'사용자' if m['role'] == 'user' else '원희'}: {m['content']}"
     )
+
+  # 만약 방금 올린 이미지가 있다면 파트에 이미지 객체와 텍스트를 함께 전달
+  if pil_img:
+    contents_to_send = [pil_img, text_prompt]
+  else:
+    contents_to_send = text_prompt
 
   with st.chat_message("assistant", avatar="🥰"):
     with st.spinner(
         "원희가 사진을 보고 답변을 고민 중... 💬"
-        if image_bytes
+        if pil_img
         else "원희가 입력 중... 💬"
     ):
-      result = ask_wonhee(chat_history, temp=0.9)
+      result = ask_wonhee(contents_to_send, temp=0.9)
 
       change = result["affection_change"]
       st.session_state.affection = max(
@@ -392,7 +378,6 @@ if prompt or is_new_photo:
           "content": result["reply"],
           "thought": result["inner_thought"],
           "image": None,
-          "image_type": None,
       })
 
       st.rerun()
