@@ -135,7 +135,7 @@ st.markdown("""
 .stApp button, .stApp [data-testid="stMarkdownContainer"] {
   font-family: 'Pretendard', -apple-system, sans-serif;
 }
-.hero-name, .stage-chip { font-family: 'Orbitron', sans-serif; }
+.hero-name, .stage-chip, .dev-badge { font-family: 'Orbitron', sans-serif; }
 
 header[data-testid="stHeader"] { background: transparent; }
 [data-testid="stToolbar"], [data-testid="stDecoration"], footer { display: none !important; }
@@ -179,6 +179,19 @@ header[data-testid="stHeader"] { background: transparent; }
   text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
 }
 .hero-sub { font-size: 12px; color: var(--muted); margin-top: 4px; letter-spacing: 1px; }
+
+/* 우측 상단 MADE BY SINE 뱃지 */
+.hero-right {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+}
+.dev-badge {
+  font-size: 10px; letter-spacing: 2px; color: var(--muted);
+  display: flex; align-items: center; gap: 4px;
+}
+.dev-badge span {
+  color: var(--neon-magenta); font-weight: 900; font-size: 12px;
+  text-shadow: 0 0 8px var(--neon-magenta);
+}
 .stage-chip {
   font-size: 12px; font-weight: 700; color: var(--neon-cyan); padding: 6px 16px; border-radius: 8px;
   background: rgba(0, 243, 255, 0.1); border: 1px solid var(--neon-cyan);
@@ -366,6 +379,7 @@ hr = int(st.session_state.heart_rate)
 beat_sec = max(0.4, min(1.5, 60 / max(hr, 40)))
 mood_safe = html.escape(str(st.session_state.mood))
 
+# Hero Card 내부에 MADE BY SINE 뱃지 추가
 st.markdown(
     "<div class='hero'>"
     "<div class='hero-left'>"
@@ -373,7 +387,10 @@ st.markdown(
     "<div><div class='hero-name'>CHLOE</div>"
     "<div class='hero-sub'>NEURAL LINK ESTABLISHED</div></div>"
     "</div>"
+    "<div class='hero-right'>"
+    "<div class='dev-badge'>MADE BY <span>SINE</span></div>"
     f"<div class='stage-chip'>{html.escape(current_stage)}</div>"
+    "</div>"
     "</div>"
     "<div class='stats'>"
     "<div class='stat'><div class='stat-label'>AFFECTION SYNC</div>"
