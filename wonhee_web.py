@@ -204,7 +204,7 @@ header[data-testid="stHeader"] { background: transparent; }
 .pulse { display: inline-block; margin-right: 6px; font-size: 16px; animation: beat 1s ease-in-out infinite; }
 @keyframes beat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.3); } 30% { transform: scale(1); } }
 
-/* ---------- Chat Bubbles (Overflow Fix & Glassmorphism) ---------- */
+/* ---------- Chat Bubbles ---------- */
 [data-testid="stChatMessage"] { 
   background: transparent; padding: 0.5rem 0; gap: 1rem; align-items: flex-end; 
 }
@@ -234,7 +234,13 @@ header[data-testid="stHeader"] { background: transparent; }
   word-break: break-word !important;
   box-sizing: border-box !important;
 }
-[data-testid="stChatMessageContent"] p { margin: 0; color: var(--ink); }
+/* 기본 텍스트(마크다운) 색상 강제 지정 */
+[data-testid="stChatMessageContent"] p, 
+[data-testid="stChatMessageContent"] div { 
+  margin: 0; 
+  color: #f0f0ff !important; /* 가독성을 위해 아주 밝은 색상으로 변경 */
+  font-size: 15px;
+}
 
 /* 유저 메시지 (네온 마젠타) */
 [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) { flex-direction: row-reverse; }
@@ -402,20 +408,23 @@ for msg in st.session_state.messages:
         if msg.get("image"):
             st.image(msg["image"], width=300, caption="보낸 사진")
         
-        # 메인 대사 + 속마음을 하나의 HTML 블록으로 합침
-        html_content = f"<div style='white-space: pre-wrap; word-break: break-word;'>{html.escape(str(msg['content']))}</div>"
+        # 메인 텍스트 색상 및 스타일 강제 지정 (가독성 해결)
+        main_text = html.escape(str(msg['content'])).replace('\n', '<br>')
+        html_content = f"<div style='color: #ffffff; font-size: 15px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;'>{main_text}</div>"
         
         if msg["role"] == "assistant" and st.session_state.show_thought and msg.get("thought"):
             thought_text = html.escape(str(msg['thought']))
+            # 속마음 스타일: 배경색을 약간 주고, 점선을 넣고, 글씨를 밝은 하늘색으로 변경
             html_content += f"""
             <div style="
-                margin-top: 12px;
-                padding-top: 10px;
-                border-top: 1px dashed rgba(0, 243, 255, 0.35);
-                font-size: 13px;
+                margin-top: 14px;
+                padding: 10px 14px;
+                border-top: 1px dashed rgba(0, 243, 255, 0.5);
+                font-size: 13.5px;
                 font-style: italic;
-                color: #8a8ab0;
-                opacity: 0.9;
+                color: #a3e8ff; 
+                background: rgba(0, 243, 255, 0.08);
+                border-radius: 8px;
                 line-height: 1.5;
             ">
                 💭 {thought_text}
