@@ -246,11 +246,6 @@ header[data-testid="stHeader"] { background: transparent; }
 }
 [data-testid="stChatMessageContent"] img { border-radius: 12px; margin-bottom: 8px; max-width: 100%; height: auto; }
 
-.thought {
-  margin-top: 10px; padding: 8px 12px; font-size: 12px; font-style: italic; color: var(--neon-cyan);
-  background: rgba(0, 243, 255, 0.05); border-left: 2px solid var(--neon-cyan); border-radius: 4px;
-}
-
 /* ---------- Chat Input & Photo Upload ---------- */
 [data-testid="stBottom"] > div { background: transparent; }
 [data-testid="stChatInput"] {
@@ -406,9 +401,28 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar=avatar):
         if msg.get("image"):
             st.image(msg["image"], width=300, caption="보낸 사진")
-        st.write(msg["content"])
+        
+        # 메인 대사 + 속마음을 하나의 HTML 블록으로 합침
+        html_content = f"<div style='white-space: pre-wrap; word-break: break-word;'>{html.escape(str(msg['content']))}</div>"
+        
         if msg["role"] == "assistant" and st.session_state.show_thought and msg.get("thought"):
-            st.markdown(f"<div class='thought'>💭 {html.escape(str(msg['thought']))}</div>", unsafe_allow_html=True)
+            thought_text = html.escape(str(msg['thought']))
+            html_content += f"""
+            <div style="
+                margin-top: 12px;
+                padding-top: 10px;
+                border-top: 1px dashed rgba(0, 243, 255, 0.35);
+                font-size: 13px;
+                font-style: italic;
+                color: #8a8ab0;
+                opacity: 0.9;
+                line-height: 1.5;
+            ">
+                💭 {thought_text}
+            </div>
+            """
+        
+        st.markdown(html_content, unsafe_allow_html=True)
 
 # ==================== MODEL CALL ====================
 def build_history(max_turns=MAX_HISTORY_TURNS):
