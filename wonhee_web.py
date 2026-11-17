@@ -28,7 +28,6 @@ st.markdown(
         background: radial-gradient(circle at top, #120c1f 0%, #06070b 100%);
         color: #f0f2f6;
     }
-    /* 3D 입체 글래스 카드 스타일 */
     .glass-card {
         background: rgba(25, 20, 38, 0.7);
         backdrop-filter: blur(16px);
@@ -40,7 +39,6 @@ st.markdown(
         text-align: center;
         margin-bottom: 10px;
     }
-    /* 홀로그램 타이틀 */
     .main-title {
         font-size: 30px;
         font-weight: 900;
@@ -57,7 +55,6 @@ st.markdown(
         font-size: 13px;
         margin-bottom: 20px;
     }
-    /* 호감도 단계 업그레이드 배너 */
     .level-banner {
         background: linear-gradient(135deg, #ff4b72 0%, #9c27b0 100%);
         padding: 12px;
@@ -129,7 +126,7 @@ def get_korea_time_info():
   return now.strftime("%Y년 %m월 %d일 %H시 %M분"), time_desc
 
 
-# 5. 세션 상태 초기화 (이름과 취향 기본값 공백 처리)
+# 5. 세션 상태 초기화
 if "user_name" not in st.session_state:
   st.session_state.user_name = ""
 if "user_fav" not in st.session_state:
@@ -194,13 +191,12 @@ user_name = st.session_state.user_name
 user_fav = st.session_state.user_fav
 
 
-# 7. 사이드바 설정 (깔끔하게 정돈된 사진 전송 및 설정)
+# 7. 사이드바 설정
 with st.sidebar:
   st.markdown("### ⚙️ 설정 & 사진 전송")
   show_thought = st.toggle("💭 클로이의 속마음 훔쳐보기", value=True)
   st.divider()
 
-  # 📸 사진 업로드 컴포넌트를 안정적인 사이드바에 배치하여 인식 오류 원천 차단
   st.markdown("### 📸 클로이에게 사진 보내기")
   uploaded_photo = st.file_uploader(
       "오늘 먹은 음식, 풍경 등을 공유해보세요!",
@@ -306,7 +302,6 @@ if current_stage != st.session_state.last_stage:
   )
   st.session_state.last_stage = current_stage
 
-# 3D 글래스 카드 메트릭 레이아웃
 col1, col2, col3 = st.columns(3)
 with col1:
   st.markdown(
@@ -354,16 +349,15 @@ for msg in st.session_state.messages:
       st.caption(f"💭 *(속마음: {msg['thought']})*")
 
 
-# AI 응답 함수 (전체 모델 풀 가동)
+# 디버깅 기능이 포함된 AI 응답 함수 (어떤 에러인지 화면에 출력)
 def ask_chloe(contents_list, temp=0.9):
   all_gemini_models = [
       "gemini-2.5-flash",
       "gemini-2.0-flash",
       "gemini-2.5-pro",
       "gemini-2.0-pro",
-      "gemini-flash",
-      "gemini-pro",
   ]
+  last_error = None
   for model_name in all_gemini_models:
     try:
       res = client.models.generate_content(
@@ -380,15 +374,18 @@ def ask_chloe(contents_list, temp=0.9):
       )
       return json.loads(res.text)
     except Exception as e:
+      last_error = str(e)
       print(f"Model {model_name} Error: {e}")
       continue
 
+  # 에러가 발생한 경우 실제 에러 내용을 화면에 띄워줍니다 (디버깅용)
+  st.error(f"🚨 API 호출 에러 발생: {last_error}")
   return {
       "reply": (
-          f"{user_name}, 지금 네트워크가 살짝 불안해서 답변이 늦어지네... 다시"
-          " 말해줘! 🥺"
+          f"{user_name}, API 에러가 났어! 자세한 건 위 빨간 박스를 확인해줘."
+          " 🥺"
       ),
-      "inner_thought": "연결에 문제가 생겼나봐. 걱정되네.",
+      "inner_thought": "API 호출에 실패했어...",
       "affection_change": 0,
       "mood": "걱정🥺",
       "heart_rate": 90,
@@ -417,7 +414,7 @@ if st.session_state.get("trigger_event", False):
       })
       st.rerun()
 
-# 12. 채팅 입력창 (안전한 멀티모달 처리)
+# 12. 채팅 입력창
 prompt = st.chat_input("클로이에게 보낼 메시지를 입력하세요... 💕")
 
 is_new_photo = (
