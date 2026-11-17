@@ -236,7 +236,7 @@ if st.session_state.get("trigger_event", False):
     with st.chat_message("assistant", avatar="🥰"):
         with st.spinner("원희가 무슨 말을 할지 고민 중... 💓"):
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-3.5-flash-lite",
                 contents=[types.Content(role="user", parts=[types.Part.from_text(text=event_prompt)])],
                 config=types.GenerateContentConfig(
                     system_instruction=build_system_instruction(st.session_state.affection),
@@ -272,7 +272,7 @@ if prompt := st.chat_input(f"원희에게 보낼 메시지를 입력하세요...
     with st.chat_message("assistant", avatar="🥰"):
         with st.spinner("원희가 입력 중... 💬"):
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-3.5-flash-lite",
                 contents=chat_history,
                 config=types.GenerateContentConfig(
                     system_instruction=build_system_instruction(st.session_state.affection),
